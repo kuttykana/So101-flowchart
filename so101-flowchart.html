@@ -1,0 +1,407 @@
+<title>SO-101 Pick-and-Place Workflow</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@700&family=Patrick+Hand&display=swap">
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a whiteboard sketch. Hand-drawn blocks, dashed stage frames, and a pinned note for details. */
+:root{
+  --bg:#ffffff;--surface:#ffffff;--ink:#1e1e1e;--mute:#57534e;--frame:#a8a29e;
+  --off:#74c0fc;--rt:#8ce99a;--lead:#ffc078;--note:#fff3bf;--mark:#e03131;
+  --hand:"Patrick Hand","Comic Sans MS","Segoe Print",cursive;
+  --head:"Kalam","Patrick Hand","Segoe Print",cursive;
+  --wob:255px 15px 225px 15px/15px 225px 15px 255px;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:400 17.5px/1.35 var(--hand)}
+.wrap{max-width:1500px;margin:0 auto;padding-block:18px 26px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:12px}
+.eyebrow{font-size:15px;color:var(--mute)}
+h1{margin:0;font:700 clamp(25px,3.2vw,36px)/1.2 var(--head);text-wrap:balance;width:fit-content;max-width:100%;padding-bottom:5px;border-bottom:3px solid var(--mark);border-radius:0 0 60% 40%/0 0 6px 4px}
+button{font:400 16px var(--hand);color:var(--ink);background:var(--surface);border:1.6px solid var(--ink);border-radius:var(--wob);padding:4px 11px;cursor:pointer}
+button:hover{background:var(--note)}
+button:focus-visible,.node:focus-visible,.railbtn:focus-visible{outline:2px dashed var(--mark);outline-offset:3px}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
+.scroller{overflow-x:auto;background:var(--surface);min-width:0}
+svg#chart{display:block;width:100%;min-width:900px;height:auto}
+aside{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;background:var(--note);border:2px solid var(--ink);border-radius:var(--wob);padding:18px 16px;display:grid;gap:9px;min-width:0}
+aside h2{margin:0;font:700 22px/1.2 var(--head);text-wrap:balance}
+aside p{margin:0;max-width:60ch}
+aside p[style]{color:#44403c!important}
+aside h3{margin:4px 0 0;font:700 17px var(--head)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chips button{font-size:15.5px;padding:3px 9px;text-align:left}
+.stages{display:grid;gap:5px}
+.stages button{text-align:left;display:flex;gap:8px}
+.stages b{font-weight:400;color:var(--mark)}
+.warn{color:var(--mark);font-size:17px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:16px;color:var(--ink);align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend svg{width:30px;height:18px;flex:none}
+.legend svg *{fill:none;stroke:var(--ink);stroke-width:1.5}
+.sw{width:22px;height:14px;border:1.5px solid var(--ink)!important;border-radius:var(--wob);display:inline-block;flex:none;background:repeating-linear-gradient(-45deg,var(--c) 0 2px,transparent 2px 5px)!important}
+
+/* chart */
+.frame path{stroke-dasharray:7 7}
+.railbtn{cursor:pointer}
+.railbg{fill:transparent}
+.railbtn:hover .railbg{fill:var(--note)}
+.rnum{font:400 15px var(--hand);fill:var(--mark)}
+.rname{font:700 16px var(--head);fill:var(--ink)}
+.rtag{font:400 13.5px var(--hand);fill:var(--mute)}
+.node{cursor:pointer;transition:opacity .2s}
+.hit{fill:transparent;stroke:none;pointer-events:all}
+.node text{pointer-events:none}
+.t,.s{paint-order:stroke;stroke:#fff;stroke-width:3.5px;stroke-linejoin:round}
+.node:focus:not(:focus-visible){outline:none}
+.t{font:400 18px var(--hand);fill:#000;text-anchor:middle}
+.s{font:400 14.5px var(--hand);fill:#44403c;text-anchor:middle}
+.g{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ring{opacity:0;pointer-events:none}
+.node:hover .ring{opacity:.45}
+.node.sel .ring{opacity:1}
+.node.dim{opacity:.2}
+.edge{transition:opacity .2s}
+.edge.on path{stroke:var(--mark);stroke-width:2.1}
+.edge.dim{opacity:.1}
+.lab{font:400 15px var(--hand);fill:var(--mark);transition:opacity .2s}
+.lab.dim{opacity:.15}
+.note{font:400 15px var(--hand);fill:var(--mute);text-anchor:middle}
+.note.strong{font:700 18px var(--head);fill:var(--mark)}
+.split{font:400 14.5px var(--hand);fill:var(--mute)}
+#packet{fill:var(--mark)}
+@media (max-width:980px){
+  .main{grid-template-columns:minmax(0,1fr)}
+  aside{top:auto;bottom:0;max-height:38vh}
+}
+@media (prefers-reduced-motion:reduce){.node,.edge,.lab{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>SO-101 vision based pick and place</h1>
+  </header>
+
+
+  <div class="main">
+    <div class="scroller"><svg id="chart" viewBox="0 18 1182 1596" role="group" aria-label="SO-101 workflow flowchart"></svg></div>
+    <aside id="panel" aria-live="polite"></aside>
+  </div>
+
+  <div class="legend" aria-label="Legend">
+    <span><svg viewBox="0 0 30 18"><rect x="2" y="2" width="26" height="14"/></svg>Process or hardware</span>
+    <span><svg viewBox="0 0 30 18"><path d="M7 2H29L23 16H1Z"/></svg>Input or output</span>
+    <span><svg viewBox="0 0 30 18"><path d="M3 4V14C3 18 27 18 27 14V4C27 0 3 0 3 4C3 8 27 8 27 4"/></svg>Dataset</span>
+    <span><svg viewBox="0 0 30 18"><path d="M15 1L29 9L15 17L1 9Z"/></svg>Decision</span>
+    <span><i class="sw" style="--c:var(--lead)"></i>Leader arm, demonstrations only</span>
+    <span><i class="sw" style="--c:var(--off)"></i>Offline training</span>
+    <span><i class="sw" style="--c:var(--rt)"></i>Real-time execution</span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script>
+<script>
+const RX=130, NS='http://www.w3.org/2000/svg';
+const STAGES=[
+ {n:1,name:['Experimental','setup'],tag:'PHYSICAL',y:20,h:155,text:'The physical rig. A human-operated leader arm, a follower arm, the Titan parts, and two cameras.'},
+ {n:2,name:['Teleoperated','demonstration','collection'],tag:'OFFLINE',y:190,h:280,text:'A person performs the task through the leader arm. The follower does the physical work. Joint data and both videos are recorded at the same time.'},
+ {n:3,name:['Dataset','preparation'],tag:'OFFLINE',y:490,h:210,text:'Recordings are synchronised and organised into observation and action pairs. Nobody labels images by hand.'},
+ {n:4,name:['AI policy','training'],tag:'OFFLINE',y:715,h:235,text:'The customised ACT model learns to map camera views and joint state to robot actions. The output is a trained policy that predicts action chunks.'},
+ {n:5,name:['Autonomous','robot','execution'],tag:'REAL TIME',y:965,h:480,text:'The trained policy drives the follower arm in a closed loop: observe, predict, execute. The leader arm is not involved.'},
+ {n:6,name:['Results and','evaluation'],tag:'OUTCOME',y:1460,h:150,text:'The task succeeds without human intervention or labelled data. Cycle time is the main thing left to improve.'}
+];
+// shape: r rect, p parallelogram, c cylinder, d diamond, n note, e terminal
+const N=[
+ {id:'s_leader',st:1,sh:'r',x:120,y:97,w:176,h:88,t:['Leader arm'],s:'Human-operated',c:'lead',g:'leader',d:'The arm a person holds and moves. It is the control input for demonstrations.',warn:'Used only during demonstration collection. It takes no part in autonomous execution.'},
+ {id:'s_follower',st:1,sh:'r',x:320,y:97,w:176,h:88,t:['Follower arm'],s:'Replicates the leader',c:'rt',g:'follower',d:'The arm that touches the parts. It copies the leader during demonstrations and is driven by the policy during deployment.',same:'exec',sameL:'Used again in execution'},
+ {id:'s_titan',st:1,sh:'r',x:520,y:97,w:176,h:88,t:['Titan components'],s:'Watch and bracelet',g:'watch',d:'The actual parts being picked and placed.'},
+ {id:'s_exo',st:1,sh:'p',x:720,y:97,w:180,h:88,t:['Exocentric camera'],s:'Overhead view',g:'cam',d:'Fixed overhead camera. It observes the whole workspace.',same:'e_exo',sameL:'Live feed in execution'},
+ {id:'s_ego',st:1,sh:'p',x:920,y:97,w:180,h:88,t:['Egocentric camera'],s:'Gripper-mounted',g:'cam',d:'Camera mounted on the gripper. It gives the close-up view of the part.',same:'e_ego',sameL:'Live feed in execution'},
+ {id:'d_op',st:2,sh:'r',x:120,y:245,w:176,h:64,t:['Operator moves','the leader arm'],c:'lead',d:'A human operator controls the leader arm to perform the task.'},
+ {id:'d_tx',st:2,sh:'r',x:320,y:245,w:176,h:64,t:['Transmit motion','to the follower'],d:'Leader arm movements are sent to the follower arm, which replicates them.'},
+ {id:'d_exec',st:2,sh:'r',x:520,y:245,w:176,h:64,t:['Follower performs','pick-and-place'],d:'The follower arm carries out the task on the actual Titan component under human control.'},
+ {id:'r_joint',st:2,sh:'p',x:520,y:400,w:176,h:60,t:['Joint positions'],s:'Recorded',d:'Robot joint position data, recorded during each demonstration.'},
+ {id:'r_exo',st:2,sh:'p',x:720,y:400,w:176,h:60,t:['Exocentric video'],s:'Recorded',d:'Overhead video, recorded at the same time as the joint data.'},
+ {id:'r_ego',st:2,sh:'p',x:920,y:400,w:176,h:60,t:['Egocentric video'],s:'Recorded',d:'Gripper video, recorded at the same time as the joint data.'},
+ {id:'d_more',st:2,sh:'d',x:320,y:400,w:176,h:96,t:['More demos','needed?'],d:'The demonstration is repeated to collect multiple task trajectories. Collection ends when enough have been recorded.'},
+ {id:'sync',st:3,sh:'r',x:720,y:540,w:440,h:56,t:['Synchronise robot states and both camera streams'],c:'off',d:'The three recorded streams are aligned in time.'},
+ {id:'org',st:3,sh:'r',x:820,y:640,w:200,h:56,t:['Organise demonstrations'],c:'off',d:'The demonstrations are organised into a training dataset.'},
+ {id:'prep',st:3,sh:'r',x:560,y:640,w:220,h:56,t:['Prepare observations','and robot actions'],c:'off',d:'Observations are paired with their corresponding robot actions.'},
+ {id:'ds',st:3,sh:'c',x:320,y:640,w:170,h:84,t:['Demonstration','dataset'],c:'off',d:'The finished training dataset. It feeds the ACT policy.'},
+ {id:'nolabel',st:3,sh:'n',x:120,y:640,w:190,h:84,t:['No manual labels'],s2:['No annotation, bounding','boxes or grasp points'],c:'note',d:'No manual image annotation, bounding boxes, or grasp-point labelling is required. The demonstrations themselves are the training signal.'},
+ {id:'t_exo',st:4,sh:'p',x:120,y:790,w:176,h:56,t:['Exocentric','observations'],c:'off',d:'Overhead views from the dataset. Model input.'},
+ {id:'t_ego',st:4,sh:'p',x:320,y:790,w:176,h:56,t:['Egocentric','observations'],c:'off',d:'Gripper views from the dataset. Model input.'},
+ {id:'t_joint',st:4,sh:'p',x:520,y:790,w:176,h:56,t:['Current','joint state'],c:'off',d:'Robot joint state from the dataset. Model input.'},
+ {id:'t_act',st:4,sh:'p',x:720,y:790,w:176,h:56,t:['Corresponding','robot actions'],c:'off',d:'The actions taken in the demonstration. The model learns to predict these.'},
+ {id:'act',st:4,sh:'r',x:420,y:895,w:776,h:64,t:['Train customised ACT policy'],s:'Action Chunking with Transformers',c:'off',d:'The policy learns the relationship between both camera views, the current joint state, and the corresponding actions.'},
+ {id:'policy',st:4,sh:'p',x:925,y:895,w:176,h:64,t:['Trained ACT policy'],s:'Predicts action chunks',c:'off',d:'The training output. It predicts sequences of robot actions, called action chunks.'},
+ {id:'load',st:5,sh:'r',x:925,y:1015,w:176,h:60,t:['Load trained policy'],s:'Follower control system',c:'rt',d:'The trained ACT policy is loaded onto the follower arm control system.'},
+ {id:'capture',st:5,sh:'r',x:320,y:1015,w:480,h:48,t:['Capture live observations and robot state'],c:'rt',d:'Both cameras and the current robot state are read at the start of each cycle.'},
+ {id:'e_exo',st:5,sh:'p',x:140,y:1095,w:164,h:56,t:['Live exocentric'],s:'Overhead',c:'rt',d:'Live overhead frame.',same:'s_exo',sameL:'Same camera as setup'},
+ {id:'e_ego',st:5,sh:'p',x:320,y:1095,w:164,h:56,t:['Live egocentric'],s:'Gripper',c:'rt',d:'Live gripper frame.',same:'s_ego',sameL:'Same camera as setup'},
+ {id:'e_state',st:5,sh:'p',x:500,y:1095,w:164,h:56,t:['Current state'],s:'Joint positions',c:'rt',d:'Current robot state of the follower arm.'},
+ {id:'infer',st:5,sh:'r',x:340,y:1195,w:560,h:60,t:['Trained ACT policy'],s:'Takes observations and robot state',c:'rt',d:'The live observations go into the trained policy.'},
+ {id:'predict',st:5,sh:'p',x:735,y:1195,w:170,h:60,t:['Next action','sequence'],c:'rt',d:'The policy predicts the next sequence of robot actions.'},
+ {id:'exec',st:5,sh:'r',x:925,y:1195,w:150,h:60,t:['Follower executes','the actions'],c:'rt',d:'The follower arm carries out the predicted actions.',same:'s_follower',sameL:'Same arm as setup'},
+ {id:'dec',st:5,sh:'d',x:925,y:1310,w:176,h:96,t:['Task','complete?'],c:'rt',d:'If not, the loop repeats with fresh observations. If so, the operation ends.'},
+ {id:'done',st:5,sh:'e',x:925,y:1410,w:240,h:44,t:['Pick-and-place complete'],c:'rt',d:'The autonomous operation finishes without human teleoperation.'},
+ {id:'ev',st:6,sh:'r',x:520,y:1495,w:860,h:36,t:['Evaluate performance'],d:'Results observed after autonomous execution.'},
+ {id:'ev_pick',st:6,sh:'r',x:120,y:1565,w:176,h:64,t:['Successful pick','and placement'],d:'Objects were picked and placed successfully.'},
+ {id:'ev_auto',st:6,sh:'r',x:320,y:1565,w:176,h:64,t:['Autonomous'],s:'No human intervention',d:'Execution ran without human intervention.'},
+ {id:'ev_label',st:6,sh:'r',x:520,y:1565,w:176,h:64,t:['No labelling'],s:'No manual annotation',d:'No manual data labelling was required.'},
+ {id:'ev_time',st:6,sh:'r',x:720,y:1565,w:176,h:64,t:['≈ 1–2 minutes'],s:'Cycle time per operation',d:'The observed cycle time is approximately 1–2 minutes per operation.'},
+ {id:'ev_next',st:6,sh:'r',x:920,y:1565,w:176,h:64,t:['Reduce cycle time'],s:'For production readiness',c:'lead',d:'This is the primary improvement area for production readiness.'}
+];
+const byId=Object.fromEntries(N.map(n=>[n.id,n]));
+const E=[
+ ['s_leader','d_op'],['s_follower','d_tx'],['s_titan','d_exec'],['s_exo','r_exo'],['s_ego','r_ego'],
+ ['d_op','d_tx'],['d_tx','d_exec'],['d_exec','r_joint'],
+ ['d_exec','d_more',{pts:[[520,277],[520,322],[320,322],[320,352]]}],
+ ['d_more','d_op',{pts:[[232,400],[120,400],[120,277]],lab:'Yes, repeat',lx:176,ly:392}],
+ ['d_more','sync',{pts:[[320,448],[320,540],[500,540]],lab:'No',lx:334,ly:464}],
+ ['r_joint','sync',{pts:[[520,430],[520,512]]}],['r_exo','sync'],['r_ego','sync',{pts:[[920,430],[920,512]]}],
+ ['sync','org',{pts:[[820,568],[820,612]]}],['org','prep'],['prep','ds'],
+ ['ds','t_exo',{pts:[[320,682],[320,738],[120,738],[120,762]]}],['ds','t_ego'],
+ ['ds','t_joint',{pts:[[320,682],[320,738],[520,738],[520,762]]}],
+ ['ds','t_act',{pts:[[320,682],[320,738],[720,738],[720,762]]}],
+ ['t_exo','act',{pts:[[120,818],[120,863]]}],['t_ego','act',{pts:[[320,818],[320,863]]}],
+ ['t_joint','act',{pts:[[520,818],[520,863]]}],['t_act','act',{pts:[[720,818],[720,863]]}],
+ ['act','policy'],['policy','load',{lab:'Deploy',lx:936,ly:961}],
+ ['load','infer',{pts:[[925,1045],[925,1145],[590,1145],[590,1165]]}],
+ ['capture','e_exo',{pts:[[140,1039],[140,1067]]}],['capture','e_ego'],['capture','e_state',{pts:[[500,1039],[500,1067]]}],
+ ['e_exo','infer',{pts:[[140,1123],[140,1165]]}],['e_ego','infer',{pts:[[320,1123],[320,1165]]}],['e_state','infer',{pts:[[500,1123],[500,1165]]}],
+ ['infer','predict'],['predict','exec'],['exec','dec'],
+ ['dec','capture',{pts:[[837,1310],[30,1310],[30,1015],[80,1015]],fb:1,lab:'No, next cycle',lx:700,ly:1302}],
+ ['dec','done',{lab:'Yes',lx:936,ly:1376}],
+ ['done','ev',{pts:[[925,1432],[925,1477]]}],
+ ['ev','ev_pick',{pts:[[120,1513],[120,1533]]}],['ev','ev_auto',{pts:[[320,1513],[320,1533]]}],['ev','ev_label'],['ev','ev_time',{pts:[[720,1513],[720,1533]]}],['ev','ev_next',{pts:[[920,1513],[920,1533]]}]
+].map(([f,t,o])=>({f,t,...(o||{})}));
+
+const VIEWS=[
+ {id:'all',l:'Full pipeline',set:null}
+];
+const SIG={
+ none:{l:'None'},
+ exo:{l:'Exocentric',ids:'s_exo r_exo sync org prep ds t_exo act policy load capture e_exo infer'},
+ ego:{l:'Egocentric',ids:'s_ego r_ego sync org prep ds t_ego act policy load capture e_ego infer'},
+ joint:{l:'Joint state',ids:'d_exec r_joint sync org prep ds t_joint act policy load capture e_state infer'},
+ act:{l:'Robot actions',ids:'ds t_act act policy load infer predict exec'}
+};
+const FULL=['s_leader','s_follower','s_titan','s_exo','s_ego','d_op','d_tx','d_exec','r_joint','r_exo','r_ego','d_more','sync','org','prep','ds','nolabel','t_exo','t_ego','t_joint','t_act','act','policy','load','capture','e_exo','e_ego','e_state','infer','predict','exec','dec','done','ev','ev_pick','ev_auto','ev_label','ev_time','ev_next'];
+const CYCLE=['capture','e_exo','e_ego','e_state','infer','predict','exec','dec'];
+const LOOP=[...CYCLE,...CYCLE,...CYCLE,'done'];
+
+const st={sel:null,stage:null,view:'all',sig:'none',seq:FULL,i:-1,playing:false,timer:null};
+const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const svg=document.getElementById('chart'),panel=document.getElementById('panel'),status=document.getElementById('status');
+const mk=(tag,a={},p=svg)=>{const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);p.appendChild(e);return e};
+const label=n=>n.t.join(' ');
+
+function anchor(n,side){
+ const skew=n.sh==='p'?16:0;
+ if(side==='t')return[n.x,n.y-n.h/2];
+ if(side==='b')return[n.x,n.y+n.h/2];
+ if(side==='l')return[n.x-n.w/2+skew/2,n.y];
+ return[n.x+n.w/2-skew/2,n.y];
+}
+function points(e){
+ if(e.pts)return e.pts;
+ const a=byId[e.f],b=byId[e.t];
+ if(a.x===b.x)return a.y<b.y?[anchor(a,'b'),anchor(b,'t')]:[anchor(a,'t'),anchor(b,'b')];
+ return a.x<b.x?[anchor(a,'r'),anchor(b,'l')]:[anchor(a,'l'),anchor(b,'r')];
+}
+const rc=window.rough?rough.svg(svg):null;
+let seed=7;
+// Draw any path by hand when rough.js is loaded, or as a plain line if it is not.
+function sketch(parent,d,o={}){
+ const opt={roughness:1.1,bowing:1.2,stroke:'#1e1e1e',strokeWidth:1.5,seed:seed++,...o};
+ let el;
+ if(rc){el=rc.path(d,opt);parent.appendChild(el)}
+ else{el=mk('path',{d,fill:'none',stroke:opt.stroke,'stroke-width':opt.strokeWidth},parent)}
+ return el;
+}
+function outline(n,pad=0){
+ const w=n.w+pad*2,h=n.h+pad*2,L=-w/2,R=w/2,T=-h/2,B=h/2;
+ if(n.sh==='p')return `M${L+16} ${T}L${R} ${T}L${R-16} ${B}L${L} ${B}Z`;
+ if(n.sh==='d')return `M0 ${T}L${R} 0L0 ${B}L${L} 0Z`;
+ if(n.sh==='c')return `M${L} ${T+10}L${L} ${B-10}C${L} ${B+3} ${R} ${B+3} ${R} ${B-10}L${R} ${T+10}C${R} ${T-3} ${L} ${T-3} ${L} ${T+10}C${L} ${T+23} ${R} ${T+23} ${R} ${T+10}`;
+ if(n.sh==='e'){const r=h/2;return `M${L+r} ${T}L${R-r} ${T}C${R+r/3} ${T} ${R+r/3} ${B} ${R-r} ${B}L${L+r} ${B}C${L-r/3} ${B} ${L-r/3} ${T} ${L+r} ${T}Z`}
+ return `M${L} ${T}L${R} ${T}L${R} ${B}L${L} ${B}Z`;
+}
+const FILL={lead:'#ffc078',off:'#74c0fc',rt:'#8ce99a',note:'#ffec99'};
+function shape(n,g){
+ const d=outline(n),c=FILL[n.c];
+ const o=c?{fill:c,fillStyle:'hachure',hachureGap:7,hachureAngle:-50+(seed%3)*8,fillWeight:1.1}:{};
+ if(n.c==='note')o.strokeLineDash=[6,5];
+ sketch(g,d,o);
+ mk('path',{class:'hit',d},g);
+ const ring=sketch(g,outline(n,7),{stroke:'#e03131',strokeWidth:2.2,roughness:1.6});
+ ring.setAttribute('class','ring');
+}
+const GLYPH={
+ leader:'M-14 -16H-6M-10 -16L-5 -28L5 -24L12 -32M12 -32m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0',
+ follower:'M-14 -16H-6M-10 -16L-5 -28L5 -24L10 -30M10 -30L15 -33M10 -30L15 -26',
+ watch:'M-5 -35H5L4 -30M-5 -35L-4 -30M-4 -19L-5 -14H5L4 -19M-6 -24.5a6 6 0 1 0 12 0a6 6 0 1 0 -12 0',
+ cam:'M-11 -31H11V-17H-11ZM-4 -24a4 4 0 1 0 8 0a4 4 0 1 0 -8 0'
+};
+function draw(){
+ STAGES.forEach(b=>{
+  const f=mk('g',{class:'frame'});
+  sketch(f,`M${RX} ${b.y}L1180 ${b.y}L1180 ${b.y+b.h}L${RX} ${b.y+b.h}Z`,{stroke:'#a8a29e',strokeWidth:1.2,roughness:.8,disableMultiStroke:true});
+  const g=mk('g',{class:'railbtn',tabindex:0,role:'button','aria-label':`Stage ${b.n}: ${b.name.join(' ')}`,'data-stage':b.n});
+  mk('rect',{class:'railbg',x:0,y:b.y,width:RX-4,height:b.h},g);
+  mk('text',{class:'rnum',x:8,y:b.y+24},g).textContent=b.n<6?`STAGE ${b.n}`:'FINAL';
+  b.name.forEach((l,j)=>mk('text',{class:'rname',x:8,y:b.y+46+j*19},g).textContent=l);
+  mk('text',{class:'rtag',x:8,y:b.y+50+b.name.length*19},g).textContent=b.tag;
+ });
+ mk('text',{class:'split',x:RX+14,y:962}).textContent='Offline pipeline above. Real-time pipeline below.';
+ const root=mk('g',{transform:`translate(${RX} 0)`});
+ E.forEach(e=>{
+  const p=points(e),g=mk('g',{class:'edge'},root),stroke=e.fb?'#e03131':'#1e1e1e';
+  const o=e.fb?{stroke,strokeWidth:1.8,strokeLineDash:[9,7],disableMultiStroke:true}:{stroke,strokeWidth:1.4,roughness:.9};
+  sketch(g,'M'+p.map(q=>q.join(' ')).join('L'),o);
+  const[a,b]=p.slice(-2),len=Math.hypot(b[0]-a[0],b[1]-a[1])||1,ux=(b[0]-a[0])/len,uy=(b[1]-a[1])/len,hl=11,hw=5.5;
+  sketch(g,`M${b[0]-ux*hl-uy*hw} ${b[1]-uy*hl+ux*hw}L${b[0]} ${b[1]}L${b[0]-ux*hl+uy*hw} ${b[1]-uy*hl-ux*hw}`,{stroke,strokeWidth:1.6,roughness:.5,disableMultiStroke:true});
+  e.el=g;
+  if(e.lab){e.labEl=mk('text',{class:'lab',x:e.lx,y:e.ly},root);e.labEl.textContent=e.lab}
+ });
+ mk('text',{class:'note',x:820,y:356},root).textContent='Recorded simultaneously';
+ mk('text',{class:'note strong',x:430,y:1255},root).textContent='Observe, predict, execute. Repeat.';
+ mk('text',{class:'note',x:430,y:1277},root).textContent='No leader arm. No teleoperation.';
+ N.forEach((n,i)=>{
+  const tilt=((i*37)%11-5)*.09;
+  const g=mk('g',{class:'node'+(n.c?' c-'+n.c:''),transform:`translate(${n.x} ${n.y}) rotate(${tilt})`,tabindex:0,role:'button','aria-label':label(n)+(n.s?', '+n.s:''),'data-id':n.id},root);
+  n.el=g;shape(n,g);
+  if(n.g)mk('path',{class:'g',d:GLYPH[n.g]},g);
+  const lines=n.t.length+(n.s?1:0)+(n.s2?n.s2.length:0);
+  let y=(n.g?22:0)+(n.g?-8:-(lines-1)*9+5);
+  n.t.forEach(l=>{mk('text',{class:'t',y},g).textContent=l;y+=18});
+  if(n.s){mk('text',{class:'s',y:y-1},g).textContent=n.s;y+=18}
+  (n.s2||[]).forEach(l=>{mk('text',{class:'s',y:y-1},g).textContent=l;y+=16});
+ });
+ st.packet=mk('circle',{id:'packet',r:7,visibility:'hidden'},root);
+}
+function neighbours(id){
+ const s=new Set([id]);E.forEach(e=>{if(e.f===id)s.add(e.t);if(e.t===id)s.add(e.f)});return s;
+}
+function apply(){
+ const v=VIEWS.find(x=>x.id===st.view),sig=SIG[st.sig].ids?new Set(SIG[st.sig].ids.split(' ')):null;
+ let base=new Set(N.filter(n=>(!v.set||v.set(n))&&(!sig||sig.has(n.id))).map(n=>n.id));
+ const walking=st.i>=0;
+ let focus=null;
+ if(st.sel&&!walking)focus=neighbours(st.sel);
+ else if(st.stage)focus=new Set(N.filter(n=>n.st===st.stage).map(n=>n.id));
+ N.forEach(n=>{
+  const lit=focus?focus.has(n.id):base.has(n.id);
+  n.el.classList.toggle('dim',!lit);
+  n.el.classList.toggle('sel',n.id===st.sel);
+  n.el.setAttribute('aria-pressed',n.id===st.sel);
+ });
+ E.forEach(e=>{
+  let lit,on=false;
+  if(focus&&st.sel){lit=e.f===st.sel||e.t===st.sel;on=lit}
+  else if(focus)lit=focus.has(e.f)&&focus.has(e.t);
+  else{lit=base.has(e.f)&&base.has(e.t);on=!!sig&&lit}
+  e.el.classList.toggle('dim',!lit);
+  e.el.classList.toggle('on',on);
+  e.el.classList.toggle('flow',!!sig&&lit&&!focus);
+  if(e.labEl)e.labEl.classList.toggle('dim',!lit);
+ });
+ document.querySelectorAll('#views button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===st.view));
+ document.querySelectorAll('#signals button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===st.sig));
+ renderPanel();
+}
+function renderStatus(){
+ if(st.i<0){status.textContent='';return}
+ if(st.seq===LOOP){
+  const c=Math.min(3,Math.floor(st.i/CYCLE.length)+1);
+  status.textContent=st.i===LOOP.length-1?'Example run finished after 3 cycles. Real cycle counts vary.':`Control loop, cycle ${c} of 3 in this example run`;
+ }else status.textContent=`Step ${st.i+1} of ${FULL.length}`;
+}
+function chip(id,txt){return `<button type="button" data-go="${id}">${txt||label(byId[id])}</button>`}
+function renderPanel(){
+ if(st.sel){
+  const n=byId[st.sel],b=STAGES[n.st-1];
+  const inc=E.filter(e=>e.t===n.id).map(e=>e.f),out=E.filter(e=>e.f===n.id).map(e=>e.t);
+  const kind={r:'Process',p:'Input or output',c:'Dataset',d:'Decision',n:'Note',e:'End point'}[n.sh];
+  const hw={s_leader:1,s_follower:1,s_titan:1}[n.id]?'Hardware':kind;
+  panel.innerHTML=`<div class="eyebrow">${b.n<6?'Stage '+b.n:'Final'} · ${b.name.join(' ')} · ${hw}</div>
+   <h2>${label(n)}</h2>${n.s?`<p style="color:var(--mute)">${n.s}</p>`:''}<p>${n.d}</p>
+   ${n.warn?`<p class="warn">${n.warn}</p>`:''}
+   ${inc.length?`<h3>Comes from</h3><div class="chips">${inc.map(i=>chip(i)).join('')}</div>`:''}
+   ${out.length?`<h3>Goes to</h3><div class="chips">${out.map(i=>chip(i)).join('')}</div>`:''}
+   ${n.same?`<h3>${n.sameL}</h3><div class="chips">${chip(n.same)}</div>`:''}
+   <div class="chips"><button type="button" data-clear="1">Back to overview</button></div>`;
+ }else if(st.stage){
+  const b=STAGES[st.stage-1];
+  panel.innerHTML=`<div class="eyebrow">${b.n<6?'Stage '+b.n:'Final'} · ${b.tag}</div><h2>${b.name.join(' ')}</h2><p>${b.text}</p>
+   <h3>Blocks</h3><div class="chips">${N.filter(n=>n.st===b.n).map(n=>chip(n.id)).join('')}</div>
+   <div class="chips"><button type="button" data-clear="1">Back to overview</button></div>`;
+ }else{
+  panel.innerHTML=`<div class="eyebrow">Overview</div><h2>From demonstration to autonomy</h2>
+   <p>A person teaches the task through the leader arm. ACT learns from those recordings. The follower arm then repeats the task alone.</p>
+   <p style="color:var(--mute)">Inputs to the policy are two camera views and the joint state. Output is a chunk of robot actions.</p>
+   <h3>Jump to a stage</h3><div class="stages">${STAGES.map(b=>`<button type="button" data-stage="${b.n}"><b>${b.n<6?b.n:'✓'}</b>${b.name.join(' ')}</button>`).join('')}</div>`;
+ }
+}
+function reveal(id){
+ byId[id].el.scrollIntoView({block:'center',inline:'center',behavior:reduce?'auto':'smooth'});
+}
+function pick(id,scroll){st.sel=id;st.stage=null;apply();if(scroll)reveal(id)}
+function stopWalk(){clearTimeout(st.timer);st.playing=false}
+function packet(a,b){
+ const e=E.find(x=>x.f===a&&x.t===b);
+ if(!e||reduce)return;
+ const len=e.el.getTotalLength(),start=performance.now(),dur=Math.min(650,250+len),c=st.packet;
+ c.setAttribute('visibility','visible');
+ (function tick(t){
+  const k=Math.min(1,(t-start)/dur),p=e.el.getPointAtLength(len*k);
+  c.setAttribute('cx',p.x);c.setAttribute('cy',p.y);
+  if(k<1)requestAnimationFrame(tick);else c.setAttribute('visibility','hidden');
+ })(start);
+}
+function goStep(i){
+ const prev=st.i>=0?st.seq[st.i]:null;
+ st.i=i;const id=st.seq[i];
+ st.sel=id;st.stage=null;apply();reveal(id);
+ if(prev)packet(prev,id);
+}
+function run(seq){
+ if(st.playing&&st.seq===seq){stopWalk();apply();return}
+ stopWalk();
+ if(st.seq!==seq||st.i>=seq.length-1)st.i=-1;
+ st.seq=seq;st.playing=true;st.view='all';st.sig='none';
+ (function tick(){
+  if(!st.playing)return;
+  if(st.i>=st.seq.length-1){st.playing=false;apply();return}
+  goStep(st.i+1);
+  st.timer=setTimeout(tick,seq===LOOP?800:1500);
+ })();
+}
+function step(d){
+ stopWalk();
+ if(st.seq!==FULL){st.seq=FULL;st.i=FULL.indexOf(st.sel)}
+ else if(st.i<0&&st.sel)st.i=FULL.indexOf(st.sel);
+ goStep(Math.max(0,Math.min(FULL.length-1,st.i+d)));
+}
+function clearAll(){stopWalk();st.sel=null;st.stage=null;st.i=-1;st.seq=FULL;apply()}
+
+draw();
+document.addEventListener('click',ev=>{
+ const t=ev.target.closest('[data-id],[data-go],[data-clear],[data-stage],[data-v],[data-s]');
+ if(!t)return;
+ const d=t.dataset;
+ if(d.id){stopWalk();st.i=-1;pick(d.id)}
+ else if(d.go){stopWalk();st.i=-1;pick(d.go,true)}
+ else if(d.clear)clearAll();
+ else if(d.stage){stopWalk();st.i=-1;st.sel=null;st.stage=+d.stage;apply()}
+ else if(d.v){clearAll();st.view=d.v;st.sig='none';apply()}
+ else if(d.s){clearAll();st.sig=d.s;st.view='all';apply()}
+});
+svg.addEventListener('keydown',ev=>{
+ if(ev.key!=='Enter'&&ev.key!==' ')return;
+ const t=ev.target.closest('[data-id],[data-stage]');
+ if(t){ev.preventDefault();t.dispatchEvent(new MouseEvent('click',{bubbles:true}))}
+});
+document.addEventListener('keydown',ev=>{
+ if(ev.key==='Escape')clearAll();
+});
+apply();
+</script>
